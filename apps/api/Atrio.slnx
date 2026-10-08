@@ -1,0 +1,14 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Atrio.Domain/Atrio.Domain.csproj" />
+    <Project Path="src/Atrio.Application/Atrio.Application.csproj" />
+    <Project Path="src/Atrio.Infrastructure/Atrio.Infrastructure.csproj" />
+    <Project Path="src/Atrio.Api/Atrio.Api.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Atrio.Domain.Tests/Atrio.Domain.Tests.csproj" />
+    <Project Path="tests/Atrio.Application.Tests/Atrio.Application.Tests.csproj" />
+    <Project Path="tests/Atrio.Architecture.Tests/Atrio.Architecture.Tests.csproj" />
+    <Project Path="tests/Atrio.Api.IntegrationTests/Atrio.Api.IntegrationTests.csproj" />
+  </Folder>
+</Solution>
