@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Atrio.Domain\Atrio.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Atrio.Application\Atrio.Application.csproj" />
+    <ProjectReference Include="..\..\src\Atrio.Infrastructure\Atrio.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Atrio.Api\Atrio.Api.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="FluentAssertions" />
+    <PackageReference Include="NetArchTest.Rules" />
+  </ItemGroup>
+</Project>
