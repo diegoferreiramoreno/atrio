@@ -1,10 +1,15 @@
 FROM node:22-bookworm-slim AS build
 WORKDIR /app
 
-ENV NODE_TLS_REJECT_UNAUTHORIZED=0
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
+
+# Configura certificados adicionais confiáveis da infraestrutura/ambiente se existirem
+COPY infra/certificates/ /usr/local/share/ca-certificates/
+RUN update-ca-certificates || true
+ENV NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt
 
 COPY apps/web/package*.json ./
-RUN npm config set strict-ssl false && npm ci
+RUN npm ci
 
 COPY apps/web/ ./
 RUN npm run build
