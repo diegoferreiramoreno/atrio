@@ -50,6 +50,9 @@ jobs:
       - name: Install dependencies
         run: npm ci --prefix apps/web
 
+      - name: Security audit
+        run: npm audit --prefix apps/web --audit-level=high
+
       - name: Typecheck
         run: npm --prefix apps/web run typecheck
 
