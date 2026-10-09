@@ -109,9 +109,13 @@ docker compose logs -f
 
 Os scripts verificam a aplicação pela **mesma origem pública** (padrão `http://localhost:3000` via Caddy reverse proxy):
 - `GET /` == 200 (Root da aplicação Web SPA)
-- `GET /api/v1/system/version` == 200 (JSON válido com campos `version` e `commit`, rejeitando fallback HTML)
+- `GET /api/v1/system/version` == 200 (objeto JSON parseado com propriedades `version` e `commit` contendo strings não vazias, rejeitando arrays, tipos primitivos, campos nulos/vazios e fallback HTML)
 - `GET /health/live` == 200 (Liveness da API)
 - `GET /health/ready` == 200 (Readiness com PostgreSQL saudável)
+
+#### Dependências dos Smoke Tests
+- **`scripts/smoke.sh` (Bash):** Requer `curl` e um interpretador JSON real instalado no PATH (`node`, `python3` ou `jq`).
+- **`scripts/smoke.ps1` (PowerShell):** Requer `curl.exe` e PowerShell 5.1+ (utiliza `ConvertFrom-Json` nativo).
 
 ### Encerrar e limpar a composição
 ```bash

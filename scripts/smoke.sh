@@ -39,6 +39,74 @@ test_endpoint() {
     return 1
 }
 
+# Valida dependências necessárias do script: curl e um interpretador com parser JSON real (node, python3 ou jq)
+if ! command -v curl >/dev/null 2>&1; then
+    echo "Erro de dependência: 'curl' é obrigatório para execução do smoke test." >&2
+    exit 1
+fi
+
+JSON_PARSER=""
+if command -v node >/dev/null 2>&1; then
+    JSON_PARSER="node"
+elif command -v python3 >/dev/null 2>&1; then
+    JSON_PARSER="python3"
+elif command -v jq >/dev/null 2>&1; then
+    JSON_PARSER="jq"
+else
+    echo "Erro de dependência: É necessário ter 'node', 'python3' ou 'jq' instalado para parsing seguro de JSON no smoke test." >&2
+    exit 1
+fi
+
+parse_and_validate_version_json() {
+    local raw="$1"
+
+    if [ "$JSON_PARSER" = "node" ]; then
+        node -e '
+            const raw = process.argv[1];
+            try {
+                const data = JSON.parse(raw);
+                if (data === null || typeof data !== "object" || Array.isArray(data)) process.exit(1);
+                if (typeof data.version !== "string" || data.version.trim() === "") process.exit(1);
+                if (typeof data.commit !== "string" || data.commit.trim() === "") process.exit(1);
+                console.log(`Version: ${data.version.trim()}, Commit: ${data.commit.trim()}`);
+                process.exit(0);
+            } catch {
+                process.exit(1);
+            }
+        ' "$raw" 2>/dev/null
+    elif [ "$JSON_PARSER" = "python3" ]; then
+        python3 -c '
+import json, sys
+raw = sys.argv[1]
+try:
+    data = json.loads(raw)
+    if not isinstance(data, dict):
+        sys.exit(1)
+    v = data.get("version")
+    c = data.get("commit")
+    if not isinstance(v, str) or not v.strip():
+        sys.exit(1)
+    if not isinstance(c, str) or not c.strip():
+        sys.exit(1)
+    print(f"Version: {v.strip()}, Commit: {c.strip()}")
+    sys.exit(0)
+except Exception:
+    sys.exit(1)
+' "$raw" 2>/dev/null
+    elif [ "$JSON_PARSER" = "jq" ]; then
+        echo "$raw" | jq -e '
+            if type == "object" and
+               (.version | type == "string" and (test("^\\s*$") | not)) and
+               (.commit | type == "string" and (test("^\\s*$") | not))
+            then
+               "Version: \(.version), Commit: \(.commit)"
+            else
+               empty | halt_error(1)
+            end
+        ' -r 2>/dev/null
+    fi
+}
+
 test_version_json() {
     local url="$1"
     local desc="$2"
@@ -50,10 +118,12 @@ test_version_json() {
         local response
         response=$(curl --fail --show-error --silent --max-time 15 "$url" 2>/dev/null || true)
 
-        # Rejeita HTML ou vazio, exige campos version e commit
-        if [ -n "$response" ] && ! echo "$response" | grep -q "^[[:space:]]*<" && echo "$response" | grep -q '"version"' && echo "$response" | grep -q '"commit"'; then
-            echo " [OK - JSON verificado com version e commit]"
-            return 0
+        if [ -n "$response" ]; then
+            local parsed_info
+            if parsed_info=$(parse_and_validate_version_json "$response"); then
+                echo " [OK - ${parsed_info}]"
+                return 0
+            fi
         fi
 
         echo -n "."
@@ -62,7 +132,7 @@ test_version_json() {
     done
 
     echo " [FALHA]"
-    echo "Erro: Endpoint ${url} não retornou JSON válido com 'version' e 'commit' após ${MAX_RETRIES} tentativas."
+    echo "Erro: Endpoint ${url} não retornou objeto JSON válido com propriedades 'version' e 'commit' contendo strings não vazias após ${MAX_RETRIES} tentativas."
     return 1
 }
 

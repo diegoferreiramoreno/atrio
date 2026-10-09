@@ -57,19 +57,39 @@ function Test-VersionEndpointJson {
     while ($attempt -le $MaxRetries) {
         try {
             $rawJson = & curl.exe --fail --show-error --silent --max-time 15 "$Url"
-            if ($LASTEXITCODE -eq 0 -and $rawJson) {
-                # Garante que não é HTML (ex: fallback SPA 200 com index.html)
+            if ($LASTEXITCODE -eq 0 -and (-not [string]::IsNullOrWhiteSpace($rawJson))) {
+                # Rejeita HTML fallback
                 if (-not $rawJson.TrimStart().StartsWith("<")) {
-                    $parsed = $rawJson | ConvertFrom-Json
-                    if ($parsed.version -and $parsed.commit) {
-                        Write-Host " [OK - Version: $($parsed.version), Commit: $($parsed.commit)]" -ForegroundColor Green
-                        return $true
+                    $parsed = $null
+                    try {
+                        $parsed = $rawJson | ConvertFrom-Json -ErrorAction Stop
+                    }
+                    catch {
+                        $parsed = $null
+                    }
+
+                    # Exige objeto JSON não nulo (não array, não primitivo)
+                    if ($null -ne $parsed -and ($parsed -is [System.Management.Automation.PSCustomObject]) -and (-not ($parsed -is [System.Array]))) {
+                        $versionProp = $parsed.PSObject.Properties["version"]
+                        $commitProp = $parsed.PSObject.Properties["commit"]
+
+                        if ($null -ne $versionProp -and $null -ne $commitProp) {
+                            $v = $versionProp.Value
+                            $c = $commitProp.Value
+
+                            # Exige strings não nulas e não vazias
+                            if (($v -is [string]) -and (-not [string]::IsNullOrWhiteSpace($v)) -and `
+                                ($c -is [string]) -and (-not [string]::IsNullOrWhiteSpace($c))) {
+                                Write-Host " [OK - Version: $($v.Trim()), Commit: $($c.Trim())]" -ForegroundColor Green
+                                return $true
+                            }
+                        }
                     }
                 }
             }
         }
         catch {
-            # curl or json parse failed
+            # curl or parse failed
         }
 
         Write-Host "." -NoNewline
@@ -78,7 +98,7 @@ function Test-VersionEndpointJson {
     }
 
     Write-Host " [FALHA]" -ForegroundColor Red
-    Write-Error "Endpoint $Url não retornou JSON válido com 'version' e 'commit' após $MaxRetries tentativas."
+    Write-Error "Endpoint $Url não retornou objeto JSON válido com propriedades 'version' e 'commit' contendo strings não vazias após $MaxRetries tentativas."
     return $false
 }
 
