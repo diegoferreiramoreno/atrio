@@ -1,9 +1,7 @@
+import { AppProviders } from './providers/AppProviders';
+
 export function App() {
-  return (
-    <div style={{ padding: '2rem', fontFamily: 'sans-serif' }}>
-      <h1>Átrio</h1>
-    </div>
-  );
+  return <AppProviders />;
 }
 
 export default App;
