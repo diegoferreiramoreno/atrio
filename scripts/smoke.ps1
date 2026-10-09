@@ -1,6 +1,6 @@
 param (
-    [string]$ApiBaseUrl = $(if ($env:API_BASE_URL) { $env:API_BASE_URL } else { "http://localhost:5000" }),
-    [string]$WebBaseUrl = $(if ($env:WEB_BASE_URL) { $env:WEB_BASE_URL } else { "http://localhost:3000" }),
+    [string]$AppBaseUrl = $(if ($env:APP_BASE_URL) { $env:APP_BASE_URL } elseif ($env:WEB_BASE_URL) { $env:WEB_BASE_URL } else { "http://localhost:3000" }),
+    [string]$ApiDirectUrl = $(if ($env:API_BASE_URL) { $env:API_BASE_URL } else { "" }),
     [int]$MaxRetries = 15,
     [int]$RetryDelaySeconds = 2
 )
@@ -8,8 +8,10 @@ param (
 $ErrorActionPreference = "Stop"
 
 Write-Host "=== ÁTRIO SMOKE TEST ===" -ForegroundColor Cyan
-Write-Host "API Target: $ApiBaseUrl"
-Write-Host "Web Target: $WebBaseUrl"
+Write-Host "Public App Target (Same-Origin): $AppBaseUrl"
+if ($ApiDirectUrl) {
+    Write-Host "Direct API Target: $ApiDirectUrl"
+}
 
 function Test-EndpointWithRetry {
     param (
@@ -43,17 +45,57 @@ function Test-EndpointWithRetry {
     return $false
 }
 
-# 1. Liveness
-Test-EndpointWithRetry -Url "$ApiBaseUrl/health/live" -Description "API Liveness" -ExpectedStatusCode 200
+function Test-VersionEndpointJson {
+    param (
+        [string]$Url,
+        [string]$Description
+    )
 
-# 2. Readiness (PostgreSQL Reachable)
-Test-EndpointWithRetry -Url "$ApiBaseUrl/health/ready" -Description "API Readiness" -ExpectedStatusCode 200
+    Write-Host "`nTestando: $Description ($Url)..." -NoNewline
+    $attempt = 1
 
-# 3. System Version Endpoint
-Test-EndpointWithRetry -Url "$ApiBaseUrl/api/v1/system/version" -Description "API System Version" -ExpectedStatusCode 200
+    while ($attempt -le $MaxRetries) {
+        try {
+            $rawJson = & curl.exe --fail --show-error --silent --max-time 15 "$Url"
+            if ($LASTEXITCODE -eq 0 -and $rawJson) {
+                # Garante que não é HTML (ex: fallback SPA 200 com index.html)
+                if (-not $rawJson.TrimStart().StartsWith("<")) {
+                    $parsed = $rawJson | ConvertFrom-Json
+                    if ($parsed.version -and $parsed.commit) {
+                        Write-Host " [OK - Version: $($parsed.version), Commit: $($parsed.commit)]" -ForegroundColor Green
+                        return $true
+                    }
+                }
+            }
+        }
+        catch {
+            # curl or json parse failed
+        }
 
-# 4. Web Root
-Test-EndpointWithRetry -Url "$WebBaseUrl/" -Description "Web Application Root" -ExpectedStatusCode 200
+        Write-Host "." -NoNewline
+        Start-Sleep -Seconds $RetryDelaySeconds
+        $attempt++
+    }
+
+    Write-Host " [FALHA]" -ForegroundColor Red
+    Write-Error "Endpoint $Url não retornou JSON válido com 'version' e 'commit' após $MaxRetries tentativas."
+    return $false
+}
+
+# 1. Web Application Root (SPA)
+Test-EndpointWithRetry -Url "$AppBaseUrl/" -Description "Web Application Root (Same-Origin)" -ExpectedStatusCode 200
+
+# 2. System Version Endpoint através da mesma origem pública (rejeita HTML, exige JSON com version e commit)
+Test-VersionEndpointJson -Url "$AppBaseUrl/api/v1/system/version" -Description "API System Version (Same-Origin JSON)"
+
+# 3. Liveness e Readiness através da mesma origem pública
+Test-EndpointWithRetry -Url "$AppBaseUrl/health/live" -Description "API Liveness (Same-Origin)" -ExpectedStatusCode 200
+Test-EndpointWithRetry -Url "$AppBaseUrl/health/ready" -Description "API Readiness (Same-Origin)" -ExpectedStatusCode 200
+
+# 4. Caso porta direta da API esteja informada, valida diretamente também
+if ($ApiDirectUrl) {
+    Test-VersionEndpointJson -Url "$ApiDirectUrl/api/v1/system/version" -Description "Direct API Version"
+}
 
 Write-Host "`n=== TODOS OS SMOKE TESTS PASSARAM COM SUCESSO! ===" -ForegroundColor Green
 exit 0

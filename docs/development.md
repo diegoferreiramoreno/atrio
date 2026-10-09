@@ -107,11 +107,11 @@ docker compose logs -f
   .\scripts\smoke.ps1
   ```
 
-Os scripts verificam:
+Os scripts verificam a aplicação pela **mesma origem pública** (padrão `http://localhost:3000` via Caddy reverse proxy):
+- `GET /` == 200 (Root da aplicação Web SPA)
+- `GET /api/v1/system/version` == 200 (JSON válido com campos `version` e `commit`, rejeitando fallback HTML)
 - `GET /health/live` == 200 (Liveness da API)
 - `GET /health/ready` == 200 (Readiness com PostgreSQL saudável)
-- `GET /api/v1/system/version` == 200 (Contrato de versão e commit)
-- `GET /` == 200 (Root da aplicação Web SPA)
 
 ### Encerrar e limpar a composição
 ```bash
