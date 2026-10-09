@@ -11,6 +11,8 @@ public sealed class PostgresContainerFixture : IAsyncLifetime
         .WithPassword("postgres")
         .Build();
 
+    public PostgreSqlContainer Container => _container;
+
     public string ConnectionString => _container.GetConnectionString();
 
     public Task InitializeAsync() => _container.StartAsync();
