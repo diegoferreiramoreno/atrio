@@ -28,6 +28,12 @@ public sealed class TraceIdMiddleware
         context.TraceIdentifier = traceId;
         context.Response.Headers[HeaderName] = traceId;
 
+        context.Response.OnStarting(() =>
+        {
+            context.Response.Headers[HeaderName] = traceId;
+            return Task.CompletedTask;
+        });
+
         await _next(context);
     }
 }

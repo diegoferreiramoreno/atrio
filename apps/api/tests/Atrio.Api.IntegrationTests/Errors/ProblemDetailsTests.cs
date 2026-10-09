@@ -36,10 +36,7 @@ public class ProblemDetailsTests : IClassFixture<ApiFactory>
         var traceId = json.GetProperty("traceId").GetString();
         traceId.Should().NotBeNullOrWhiteSpace();
 
-        // Header de resposta também deve conter trace id correspondente
-        if (response.Headers.TryGetValues("X-Trace-Id", out var headerValues))
-        {
-            headerValues.First().Should().Be(traceId);
-        }
+        response.Headers.GetValues("X-Trace-Id").Should().ContainSingle()
+            .Which.Should().Be(traceId);
     }
 }
